@@ -10,30 +10,17 @@ Based on **Prof. Warren Powell's** *Sequential Decision Analytics (SDA)* framewo
 
 ---
 
-## 💡 What is the Sequential RHS Update?
-
-In grid-scale battery storage arbitrage:
-1. At each hour $t$, the battery has a physical **State of Charge ($S_t$)**.
-2. An optimization solver evaluates a forward look-ahead window of $H$ hours (e.g. 24 hours) with forecasted wholesale electricity prices.
-3. The battery dynamics matrix $A$ (efficiency losses, energy balances) is **structurally invariant**.
-4. The physical state enters the model **purely as the Right-Hand Side ($b$)** of the initial energy balance constraint:
-   $$soc_1 - \eta_c p_{c,1} + \frac{1}{\eta_d} p_{d,1} = \mathbf{S_t}$$
-5. **Only the first hour's decision ($p_{c,1}^*, p_{d,1}^*$) is actually committed**. 
-6. As reality unfolds, physical SOC updates to $S_{t+1}$, a new forecast arrives, and the solver updates $b[0]$ in-place without rebuilding the model!
-
----
-
 ## 🎛️ Parameters You Can Play Around With in the App
 
 | Parameter Category | Parameter | What It Controls & Why It's Interesting |
 | :--- | :--- | :--- |
 | **Initial State (Featured!)** | **Initial SOC ($SOC_0$)** | Sets the starting energy level (and the initial RHS $b[0]$). Starting empty (10%) forces the battery to charge first, whereas starting full (90%) lets it cash in on early morning price spikes! |
 | **Look-Ahead Window** | **Horizon Length ($H$)** | Adjust from 4h to 36h. Demonstrates **myopic vs. farsighted arbitrage**: a 6h horizon sells too early for moderate peaks and misses evening super-peaks! |
-| **Terminal Condition** | **Terminal SOC Policy** | Choose between Free terminal SOC, Cyclic ($SOC_{end} \ge SOC_{init}$), or Fixed target level. |
 | **Battery Sizing** | **Capacity & Power ($E_{max}, P_{max}$)** | Configures storage duration (e.g. 4-hour utility scale vs 2-hour peaker) and C-rate. |
 | **Efficiency** | **Round-Trip Efficiency ($\eta_{rt}$)** | From 75% to 98%. Dictates the minimum arbitrage spread needed to overcome roundtrip losses. |
 | **Battery Health** | **Degradation Cost ($/MWh)** | Cell cycling wear cost. Acts as an economic deadband, preventing the battery from cycling for tiny price spreads. |
 | **Market Profiles** | **Wholesale Price Scenarios** | Test against California Duck Curve, Summer Heatwave Spikes, Winter Dual-Peak, and Negative Pricing! |
+| **Market Volatility** | **Day-to-Day Price Variation** | Scale day-to-day weather divergence and intra-day wholesale price volatility across multi-day horizons. |
 | **Information State** | **Forecast Uncertainty ($\sigma$)** | Introduces lead-time dependent noise to future hours, showcasing real-time sequential adaptation. |
 
 ---

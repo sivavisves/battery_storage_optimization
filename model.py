@@ -256,15 +256,8 @@ def simulate_rolling_horizon(
         else:
             forecast_prices = true_window.copy()
 
-        # Determine terminal target condition
-        terminal_target = None
-        if terminal_mode == "cyclic_initial":
-            terminal_target = initial_soc_mwh
-        elif terminal_mode == "target_frac":
-            terminal_target = battery.capacity_mwh * terminal_target_frac
-
-        # Solve step via in-place RHS update
-        sol = optimizer.solve_step(current_soc, forecast_prices, terminal_target)
+        # Terminal condition: Unconstrained profit maximization (no terminal SOC lower bound)
+        sol = optimizer.solve_step(current_soc, forecast_prices, terminal_target_mwh=None)
 
         step_solve_times.append(sol["solve_time_ms"])
 

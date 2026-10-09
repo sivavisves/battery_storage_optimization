@@ -52,13 +52,6 @@ st.markdown(
         color: #38BDF8;
         margin-top: 4px;
     }
-    .highlight-rhs {
-        background-color: rgba(59, 130, 246, 0.15);
-        border-left: 4px solid #3B82F6;
-        padding: 12px 16px;
-        border-radius: 0 8px 8px 0;
-        margin: 12px 0;
-    }
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
     }
@@ -76,8 +69,7 @@ st.markdown(
 # ------------------------------------------------------------------------------
 st.sidebar.title("⚡ Battery Optimizer")
 st.sidebar.markdown(
-    "Interactive **Rolling Horizon & Sequential RHS Update** Simulator based on "
-    "Warren Powell's *Sequential Decision Analytics*."
+    "Interactive **Rolling Horizon & Sequential RHS Update** Simulator"
 )
 
 st.sidebar.header("1. Market Scenario & Horizon")
@@ -96,6 +88,15 @@ sim_days = st.sidebar.radio(
     horizontal=True,
 )
 total_hours = sim_days * 24
+
+price_variation = st.sidebar.slider(
+    "Day-to-Day Price Variation",
+    min_value=0.0,
+    max_value=1.0,
+    value=0.5,
+    step=0.1,
+    help="Controls the magnitude of day-to-day weather divergence and market price volatility.",
+)
 
 st.sidebar.header("2. Initial State & Rolling Horizon")
 
@@ -132,22 +133,6 @@ lookahead_horizon = st.sidebar.slider(
         "Short horizons (e.g., 6h) exhibit myopic behavior, while longer horizons (24h) plan globally."
     ),
 )
-
-terminal_mode_label = st.sidebar.selectbox(
-    "Terminal SOC Policy",
-    [
-        "Free (Unconstrained profit maximization)",
-        "Cyclic (Reserve energy: SOC_end >= SOC_initial)",
-        "Target Level (SOC_end >= 50% capacity)",
-    ],
-    index=0,
-    help="Boundary condition enforced at the end of the look-ahead horizon.",
-)
-terminal_mode_key = "free"
-if "Cyclic" in terminal_mode_label:
-    terminal_mode_key = "cyclic_initial"
-elif "Target" in terminal_mode_label:
-    terminal_mode_key = "target_frac"
 
 st.sidebar.header("3. Battery Specifications")
 capacity_mwh = st.sidebar.number_input(
@@ -211,7 +196,7 @@ battery = BatteryParameters(
     degradation_cost_per_mwh=degradation_cost,
 )
 
-prices = get_scenario_prices(scenario_name, T=total_hours)
+prices = get_scenario_prices(scenario_name, T=total_hours, variation=price_variation)
 initial_soc_mwh = capacity_mwh * (initial_soc_pct / 100.0)
 
 sim_res = simulate_rolling_horizon(
@@ -219,8 +204,6 @@ sim_res = simulate_rolling_horizon(
     price_profile=prices,
     initial_soc_mwh=initial_soc_mwh,
     horizon=lookahead_horizon,
-    terminal_mode=terminal_mode_key,
-    terminal_target_frac=0.50,
     forecast_noise_std=forecast_noise,
     seed=42,
 )
@@ -234,8 +217,8 @@ st.markdown(
     f"Market Scenario: *{scenario_name}* · Duration: *{total_hours} Hours*"
 )
 
-# Scenario Description Callout
-st.info(f"💡 **Market Context**: {SCENARIO_DESCRIPTIONS[scenario_name]}")
+# # Scenario Description Callout
+# st.info(f"💡 **Market Context**: {SCENARIO_DESCRIPTIONS[scenario_name]}")
 
 # Top Metric Cards
 mcol1, mcol2, mcol3, mcol4, mcol5 = st.columns(5)
@@ -305,12 +288,11 @@ st.write("")
 # ------------------------------------------------------------------------------
 # Main Content Tabs
 # ------------------------------------------------------------------------------
-tab1, tab2, tab3, tab4 = st.tabs(
+tab1, tab2, tab3 = st.tabs(
     [
         "📈 Rolling Horizon Dispatch",
-        "🔄 Sequential RHS Update Explorer",
         "⚖️ Parameter Sensitivity & Comparison",
-        "📘 Mathematical Mechanics & Theory",
+        "📐 Optimization Model",
     ]
 )
 
@@ -444,9 +426,37 @@ with tab1:
         barmode="relative",
     )
 
-    fig.update_yaxes(title_text="Dispatch Power (MW)", row=1, col=1, secondary_y=False)
-    fig.update_yaxes(title_text="Wholesale Price ($/MWh)", row=1, col=1, secondary_y=True)
-    fig.update_yaxes(title_text="Stored Energy (MWh)", row=2, col=1)
+    # Symmetrical zero-centered limits for both primary and secondary Y-axes
+    p_lim = battery.p_max_mw * 1.15
+    max_abs_price = max(float(np.max(np.abs(prices))), 10.0)
+    price_lim = max_abs_price * 1.15
+
+    fig.update_yaxes(
+        title_text="Dispatch Power (MW)",
+        range=[-p_lim, p_lim],
+        zeroline=True,
+        zerolinecolor="rgba(148, 163, 184, 0.35)",
+        zerolinewidth=1.5,
+        row=1,
+        col=1,
+        secondary_y=False,
+    )
+    fig.update_yaxes(
+        title_text="Wholesale Price ($/MWh)",
+        range=[-price_lim, price_lim],
+        zeroline=True,
+        zerolinecolor="rgba(148, 163, 184, 0.35)",
+        zerolinewidth=1.5,
+        row=1,
+        col=1,
+        secondary_y=True,
+    )
+    fig.update_yaxes(
+        title_text="Stored Energy (MWh)",
+        range=[0, battery.capacity_mwh * 1.05],
+        row=2,
+        col=1,
+    )
     fig.update_xaxes(title_text="Simulation Hour (t)", row=2, col=1)
 
     st.plotly_chart(fig, use_container_width=True)
@@ -494,239 +504,9 @@ with tab1:
 
 
 # ------------------------------------------------------------------------------
-# TAB 2: Sequential RHS Update Explorer (The Core Educational Feature)
+# TAB 2: Parameter Sensitivity & Comparison
 # ------------------------------------------------------------------------------
 with tab2:
-    st.subheader("🔍 Inside the Sequential Loop: The In-Place RHS Update")
-    st.markdown(
-        """
-        In sequential decision analytics, the optimization matrix $A$ representing the battery physics 
-        **never changes**. What changes at each hour $t$ is the **Right-Hand Side (RHS)** value of the initial state constraint:
-        $$SOC_1 - \eta_c p_{c,1} + \frac{1}{\eta_d} p_{d,1} = \mathbf{S_t}$$
-        where $\mathbf{S_t}$ is the battery's physical State of Charge at the beginning of hour $t$.
-        """
-    )
-
-    inspect_t = st.slider(
-        "Select Decision Hour (t) to Inspect",
-        min_value=0,
-        max_value=total_hours - 1,
-        value=min(8, total_hours - 1),
-        step=1,
-        help="Explore the exact state, RHS pointer, and look-ahead plan solved at this step.",
-    )
-
-    plan = sim_res["lookahead_plans"][inspect_t]
-    current_rhs_val = plan["current_soc_rhs"]
-    window_len = len(plan["forecast_prices"])
-    window_x = [inspect_t + tau for tau in range(window_len)]
-
-    # Highlight RHS card
-    st.markdown(
-        f"""
-        <div class="highlight-rhs">
-            <h4 style="margin:0 0 6px 0; color:#38BDF8;">⚡ Hour t = {inspect_t} Optimization State</h4>
-            <div><b>Physical State (Updated RHS):</b> <span style="font-size:1.15rem; color:#F59E0B; font-weight:700;">{current_rhs_val:.2f} MWh</span> ({current_rhs_val/battery.capacity_mwh*100:.1f}% SOC)</div>
-            <div><b>RHS Equality Constraint Mutated in Solver:</b> <code>soc[0] - {battery.eta_c:.3f}*p_c[0] + {1.0/battery.eta_d:.3f}*p_d[0] == <b>{current_rhs_val:.2f}</b></code></div>
-            <div><b>Committed Decision (Implemented for Hour {inspect_t}):</b> 
-                Charge = <b>{sim_res['realized_pc'][inspect_t]:.1f} MW</b> | 
-                Discharge = <b>{sim_res['realized_pd'][inspect_t]:.1f} MW</b> | 
-                Step Profit = <b>${sim_res['step_profits'][inspect_t]:.2f}</b>
-            </div>
-            <div><b>Solver Execution Time:</b> <code>{plan['solve_time_ms']:.3f} ms</code> (Zero AML matrix re-allocation!)</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    # Chart: History vs Lookahead Plan
-    fig_step = make_subplots(
-        rows=2,
-        cols=1,
-        shared_xaxes=True,
-        vertical_spacing=0.08,
-        subplot_titles=(
-            f"Hour {inspect_t}: Look-Ahead Dispatch Plan vs Realized Past",
-            f"Hour {inspect_t}: Look-Ahead SOC Trajectory Plan vs Realized Past",
-        ),
-        specs=[[{"secondary_y": True}], [{"secondary_y": False}]],
-    )
-
-    # 1. Past Realized Dispatch
-    if inspect_t > 0:
-        past_x = list(range(inspect_t))
-        fig_step.add_trace(
-            go.Bar(
-                x=past_x,
-                y=sim_res["realized_pd"][:inspect_t],
-                name="Past Discharge (MW)",
-                marker_color="rgba(245, 158, 11, 0.4)",
-            ),
-            row=1,
-            col=1,
-            secondary_y=False,
-        )
-        fig_step.add_trace(
-            go.Bar(
-                x=past_x,
-                y=-sim_res["realized_pc"][:inspect_t],
-                name="Past Charge (MW)",
-                marker_color="rgba(16, 185, 129, 0.4)",
-            ),
-            row=1,
-            col=1,
-            secondary_y=False,
-        )
-
-    # 2. Implemented Decision at Hour inspect_t
-    fig_step.add_trace(
-        go.Bar(
-            x=[inspect_t],
-            y=[sim_res["realized_pd"][inspect_t]],
-            name="Committed Discharge (t)",
-            marker_color="#F59E0B",
-        ),
-        row=1,
-        col=1,
-        secondary_y=False,
-    )
-    fig_step.add_trace(
-        go.Bar(
-            x=[inspect_t],
-            y=[-sim_res["realized_pc"][inspect_t]],
-            name="Committed Charge (t)",
-            marker_color="#10B981",
-        ),
-        row=1,
-        col=1,
-        secondary_y=False,
-    )
-
-    # 3. Look-Ahead Planned Dispatch (Future steps beyond inspect_t)
-    if window_len > 1:
-        future_x = window_x[1:]
-        fig_step.add_trace(
-            go.Scatter(
-                x=future_x,
-                y=plan["planned_pd"][1:],
-                name="Look-Ahead Planned Discharge (Ghost)",
-                line=dict(color="#F59E0B", dash="dash", width=2),
-                mode="lines+markers",
-            ),
-            row=1,
-            col=1,
-            secondary_y=False,
-        )
-        fig_step.add_trace(
-            go.Scatter(
-                x=future_x,
-                y=-plan["planned_pc"][1:],
-                name="Look-Ahead Planned Charge (Ghost)",
-                line=dict(color="#10B981", dash="dash", width=2),
-                mode="lines+markers",
-            ),
-            row=1,
-            col=1,
-            secondary_y=False,
-        )
-
-    # Look-ahead forecast price
-    fig_step.add_trace(
-        go.Scatter(
-            x=window_x,
-            y=plan["forecast_prices"],
-            name="Look-Ahead Price Forecast",
-            line=dict(color="#8B5CF6", width=2),
-        ),
-        row=1,
-        col=1,
-        secondary_y=True,
-    )
-
-    # 4. SOC Plot: Past Realized SOC vs Look-Ahead Planned SOC
-    past_soc_x = list(range(inspect_t + 1))
-    fig_step.add_trace(
-        go.Scatter(
-            x=past_soc_x,
-            y=sim_res["realized_soc"][: inspect_t + 1],
-            name="Realized Past SOC",
-            line=dict(color="#06B6D4", width=3),
-        ),
-        row=2,
-        col=1,
-    )
-
-    # Current step RHS dot
-    fig_step.add_trace(
-        go.Scatter(
-            x=[inspect_t],
-            y=[current_rhs_val],
-            mode="markers+text",
-            name="Current State S_t (RHS)",
-            marker=dict(size=14, color="#F59E0B", symbol="star"),
-            text=[f"RHS: {current_rhs_val:.1f} MWh"],
-            textposition="top center",
-        ),
-        row=2,
-        col=1,
-    )
-
-    # Planned SOC trajectory over window
-    planned_soc_x = [inspect_t + tau for tau in range(window_len)]
-    fig_step.add_trace(
-        go.Scatter(
-            x=planned_soc_x,
-            y=plan["planned_soc"],
-            name="Planned SOC Trajectory (Look-Ahead)",
-            line=dict(color="#38BDF8", dash="dash", width=2.5),
-            mode="lines+markers",
-        ),
-        row=2,
-        col=1,
-    )
-
-    # Look-Ahead Window Shading
-    fig_step.add_vrect(
-        x0=inspect_t,
-        x1=min(inspect_t + window_len, total_hours),
-        fillcolor="rgba(59, 130, 246, 0.08)",
-        layer="below",
-        line_width=1,
-        line_dash="dot",
-        line_color="#3B82F6",
-        annotation_text="Look-Ahead Horizon Window",
-        annotation_position="top left",
-        row=1,
-        col=1,
-    )
-
-    fig_step.update_layout(
-        template="plotly_dark",
-        height=580,
-        margin=dict(l=40, r=40, t=50, b=30),
-        legend=dict(orientation="h", yanchor="bottom", y=1.03, xanchor="right", x=1),
-    )
-    fig_step.update_yaxes(title_text="Dispatch (MW)", row=1, col=1, secondary_y=False)
-    fig_step.update_yaxes(title_text="Price ($/MWh)", row=1, col=1, secondary_y=True)
-    fig_step.update_yaxes(title_text="SOC (MWh)", row=2, col=1)
-    fig_step.update_xaxes(title_text="Hour", row=2, col=1)
-
-    st.plotly_chart(fig_step, use_container_width=True)
-
-    st.markdown(
-        """
-        > **Key Takeaway**: Notice how the model planned ahead for the entire dashed window, but 
-        > the simulation **only commits step t**! At hour $t+1$, a new price forecast arrives, 
-        > the actual physical state becomes the new RHS, and the model re-optimizes. That is 
-        > the essence of Model Predictive Control / Rolling Horizon sequential optimization.
-        """
-    )
-
-
-# ------------------------------------------------------------------------------
-# TAB 3: Parameter Sensitivity & Comparison
-# ------------------------------------------------------------------------------
-with tab3:
     st.subheader("⚖️ Parameter Sensitivity & Strategy Comparison")
     st.markdown(
         "Explore how key parameters dramatically shift battery arbitrage behavior, "
@@ -761,8 +541,6 @@ with tab3:
                 price_profile=prices,
                 initial_soc_mwh=init_val,
                 horizon=lookahead_horizon,
-                terminal_mode=terminal_mode_key,
-                terminal_target_frac=0.50,
             )
             fig_comp.add_trace(
                 go.Scatter(
@@ -818,8 +596,6 @@ with tab3:
                 price_profile=prices,
                 initial_soc_mwh=initial_soc_mwh,
                 horizon=h_len,
-                terminal_mode=terminal_mode_key,
-                terminal_target_frac=0.50,
             )
             fig_comp.add_trace(
                 go.Scatter(
@@ -878,8 +654,6 @@ with tab3:
                 price_profile=prices,
                 initial_soc_mwh=initial_soc_mwh,
                 horizon=lookahead_horizon,
-                terminal_mode=terminal_mode_key,
-                terminal_target_frac=0.50,
             )
             summary_rows.append(
                 {
@@ -916,8 +690,6 @@ with tab3:
                 price_profile=prices,
                 initial_soc_mwh=initial_soc_mwh,
                 horizon=lookahead_horizon,
-                terminal_mode=terminal_mode_key,
-                terminal_target_frac=0.50,
             )
             summary_rows.append(
                 {
@@ -931,67 +703,94 @@ with tab3:
 
 
 # ------------------------------------------------------------------------------
-# TAB 4: Mathematical Mechanics & Theory
+# TAB 3: Optimization Model Formulation
 # ------------------------------------------------------------------------------
-with tab4:
-    st.subheader("📘 Sequential Decision Analytics: The 5 Elements & RHS Updates")
+with tab3:
+    st.subheader("📐 Battery Storage Optimization Model")
     st.markdown(
         r"""
-        This application implements the canonical framework for **Sequential Decision Analytics (SDA)** 
-        formalized by **Prof. Warren Powell** (*Sequential Decision Analytics and Modeling*, Princeton University).
+        At each rolling decision hour $t$, the battery energy arbitrage problem is solved as a 
+        **Direct Look-Ahead (DLA) Linear Program** over a forward horizon of $H$ hours ($\tau = 1, \dots, H$).
+        """
+    )
+
+    st.markdown("#### 1. Mathematical Formulation")
+    st.markdown(
+        r"""
+        **Decision Variables** (for each interval $\tau \in \{1, \dots, H\}$):
+        - $p_{c,\tau} \ge 0$: Battery charging power (MW)
+        - $p_{d,\tau} \ge 0$: Battery discharging power (MW)
+        - $soc_\tau$: Battery State of Charge at the end of interval $\tau$ (MWh)
 
         ---
 
-        ### 1. The 5 Core Elements of Powell's Framework
-        Every sequential optimization problem is characterized by five fundamental components:
+        **Objective Function:**
+        $$\max_{\{p_c, p_d, soc\}} \sum_{\tau=1}^H \left[ \left(\mathbf{\lambda_{t+\tau-1|t}} - c_{\text{deg}}\right) p_{d,\tau} - \left(\mathbf{\lambda_{t+\tau-1|t}} + c_{\text{deg}}\right) p_{c,\tau} \right] \Delta t$$
 
-        1. **State Variable ($S_t$)**:
-           The physical state of the battery at time $t$:
-           $$S_t = SOC_t \in [SOC_{min}, SOC_{max}]$$
-           plus the updated market price information and forecasts.
-
-        2. **Decision Variable ($x_t$)**:
-           The actions taken at time step $t$:
-           $$x_t = (p_{c,t}, p_{d,t}) \ge 0$$
-           subject to power ratings $p_{c,t} \le P_{max}$ and $p_{d,t} \le P_{max}$.
-
-        3. **Exogenous Information ($W_{t+1}$)**:
-           Information that arrives between $t$ and $t+1$ (e.g., realized wholesale electricity price $\lambda_t$, revised solar/wind generation, forecast adjustments).
-
-        4. **Transition Function ($S_{t+1} = f(S_t, x_t, W_{t+1})$)**:
-           The physical energy conservation equation:
-           $$S_{t+1} = S_t + \eta_c \Delta t \cdot p_{c,t} - rac{\Delta t}{\eta_d} p_{d,t}$$
-
-        5. **Objective Function / Contribution ($C(S_t, x_t)$)**:
-           The instantaneous financial margin realized at step $t$:
-           $$C(S_t, x_t) = \lambda_t \cdot (p_{d,t} - p_{c,t}) - c_{deg} \cdot p_{d,t}$$
-
-        ---
-
-        ### 2. Direct Look-Ahead (DLA) Policy & Rolling Horizon
-        At each hour $t$, we solve a Direct Look-Ahead linear program over horizon $H$:
+        **Subject to Constraints:**
         $$
-        \max_{\{p_c, p_d, soc\}} \sum_{	au=1}^H \left[ (\lambda_{t+	au-1|t} - c_{deg}) p_{d,	au} - (\lambda_{t+	au-1|t} + c_{deg}) p_{c,	au} ight] \Delta t
-        $$
-        subject to:
-        $$
-        egin{aligned}
-        	ext{Row 1 (The RHS Update!):} \quad & soc_1 - \eta_c p_{c,1} + rac{1}{\eta_d} p_{d,1} = \mathbf{S_t} \
-        	ext{Rows } 2 \dots H: \quad & soc_	au - soc_{	au-1} - \eta_c p_{c,	au} + rac{1}{\eta_d} p_{d,	au} = 0 \
-        	ext{Bounds:} \quad & 0 \le p_{c,	au} \le P_{max}, \quad 0 \le p_{d,	au} \le P_{max} \
-        & SOC_{min} \le soc_	au \le SOC_{max}
+        \begin{aligned}
+        \text{Initial Energy Balance } (\tau=1): \quad & soc_1 - \eta_c \Delta t \cdot p_{c,1} + \frac{\Delta t}{\eta_d} p_{d,1} = \mathbf{S_t} \\
+        \text{Inter-Temporal Dynamics } (\tau = 2, \dots, H): \quad & soc_\tau - soc_{\tau-1} - \eta_c \Delta t \cdot p_{c,\tau} + \frac{\Delta t}{\eta_d} p_{d,\tau} = 0 \\
+        \text{Power Capacity Bounds:} \quad & 0 \le p_{c,\tau} \le P_{\max}, \quad 0 \le p_{d,\tau} \le P_{\max}, \quad \forall \tau = 1, \dots, H \\
+        \text{Storage Energy Bounds:} \quad & SOC_{\min} \le soc_\tau \le SOC_{\max}, \quad \forall \tau = 1, \dots, H
         \end{aligned}
         $$
-
-        ---
-
-        ### 3. Why In-Place RHS Updating is Crucial in Production
-        In standard naive code, developers rebuild the optimization model from scratch at every step $t$. 
-        This re-allocates memory, regenerates thousands of AML AST object nodes, and forces the solver into a cold start.
-
-        By contrast, the **Persistent RHS Approach**:
-        - Keeps the constraint matrix $A_{eq}$ loaded in solver memory.
-        - Mutates pointer $b_{eq}[0] = S_t$ in-place (a few nanoseconds).
-        - Allows solvers (like HiGHS, Gurobi, or CPLEX) to perform **Dual Simplex Warm Starts**, solving subsequent steps in microsecond speed!
         """
+    )
+
+    st.markdown("---")
+    st.markdown("#### 2. Parameters Updated at Every Time Step ($t$)")
+    st.markdown(
+        "In the rolling horizon loop, the optimization model structure remains identical while only **two parameters mutate** at each hour:"
+    )
+
+    col_up1, col_up2 = st.columns(2)
+    with col_up1:
+        st.markdown(
+            r"""
+            <div class="metric-card" style="border-left: 4px solid #F59E0B; margin-bottom: 12px;">
+                <div style="font-size:1.05rem; font-weight:700; color:#F59E0B; margin-bottom:6px;">
+                    🔄 1. Physical State of Charge (RHS): <code>S_t</code>
+                </div>
+                <div style="font-size:0.9rem; color:#CBD5E1; line-height:1.5;">
+                    <b>Location in Model:</b> Right-Hand Side (RHS) of the initial energy balance constraint (&tau; = 1).<br>
+                    <b>Why it updates:</b> Reflects the battery's actually realized physical State of Charge at the start of hour <i>t</i> resulting from preceding dispatches.<br>
+                    <b>Solver Action:</b> Mutates the RHS equality vector in-place: <code>b_eq[0] = S_t</code> (fast warm-start solve).
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with col_up2:
+        st.markdown(
+            r"""
+            <div class="metric-card" style="border-left: 4px solid #38BDF8; margin-bottom: 12px;">
+                <div style="font-size:1.05rem; font-weight:700; color:#38BDF8; margin-bottom:6px;">
+                    🔄 2. Price Forecast Vector: <code>&lambda;_{t+&tau;-1|t}</code>
+                </div>
+                <div style="font-size:0.9rem; color:#CBD5E1; line-height:1.5;">
+                    <b>Location in Model:</b> Linear objective function cost coefficient vector <code>c</code>.<br>
+                    <b>Why it updates:</b> At each step <i>t</i>, the look-ahead horizon rolls forward [<i>t</i> &hellip; <i>t</i>+<i>H</i>-1], incorporating the latest market price forecast and resolving near-term uncertainty.<br>
+                    <b>Solver Action:</b> Mutates the linear objective coefficients <code>c</code> for charging and discharging variables.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.markdown(
+        """
+        <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(148, 163, 184, 0.15); border-radius: 8px; padding: 12px 16px; margin-top: 8px;">
+            <span style="color: #94A3B8; font-weight: 600;">🔒 Structurally Invariant Elements (Unchanged Across All Steps):</span>
+            <ul style="margin: 6px 0 0 0; color: #CBD5E1; font-size: 0.88rem;">
+                <li><b>Constraint Matrix (A_eq):</b> Efficiency coefficients (&eta;_c, 1/&eta;_d) and conservation physics stay constant.</li>
+                <li><b>Intermediate Equality RHS (b_eq[&tau; &gt; 1]):</b> Exactly 0 for all future look-ahead intervals.</li>
+                <li><b>Decision Bounds:</b> Inverter limits [0, P_max] and energy bounds [SOC_min, SOC_max].</li>
+                <li><b>Degradation Cost:</b> Battery cell wear cost per MWh (c_deg).</li>
+            </ul>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
