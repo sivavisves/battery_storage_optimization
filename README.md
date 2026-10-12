@@ -6,7 +6,7 @@
 
 An interactive **Streamlit** application featuring **Sequential Optimization and Rolling Horizon Dispatch** for battery storage systems. 
 
-Based on **Prof. Warren Powell's** [*Sequential Decision Analytics (SDA)*](https://warrenpowell.org/sdam/) framework and recent research on [market-based storage dispatch](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5377300), this repository demonstrates how persistent models and **in-place Right-Hand Side (RHS) updates** empower real-time battery arbitrage under shifting market forecasts.
+Based on **Prof. Warren Powell's** [*Sequential Decision Analytics (SDA)*](https://warrenpowell.org/sdam/) framework and recent research on [market-based storage dispatch](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5377300), this repository demonstrates how persistent models empower real-time battery arbitrage under shifting market forecasts.
 
 ---
 
@@ -21,7 +21,6 @@ Based on **Prof. Warren Powell's** [*Sequential Decision Analytics (SDA)*](https
 | **Battery Health** | **Degradation Cost ($/MWh)** | Cell cycling wear cost. Acts as an economic deadband, preventing the battery from cycling for tiny price spreads. |
 | **Market Profiles** | **Wholesale Price Scenarios** | Test against California Duck Curve, Summer Heatwave Spikes, Winter Dual-Peak, and Negative Pricing! |
 | **Market Volatility** | **Day-to-Day Price Variation** | Scale day-to-day weather divergence and intra-day wholesale price volatility across multi-day horizons. |
-| **Information State** | **Forecast Uncertainty ($\sigma$)** | Introduces lead-time dependent noise to future hours, showcasing real-time sequential adaptation. |
 
 ---
 
@@ -66,10 +65,8 @@ This application builds upon and is inspired by the following literature:
 - **Warren B. Powell**, [**Sequential Decision Analytics and Modeling: Modeling with Python**](https://warrenpowell.org/sdam/), Princeton University.
   - Formalizes sequential decision analytics (SDA), direct look-ahead (DLA) policies, state transition dynamics, and persistent rolling horizon formulations.
 
-- **Siva Visvesvaran, Jacob Mays, and Kaleb Smith**, [**Market-based Storage Dispatch and Capacity Accreditation in Electricity Markets**](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5377300), *SSRN Working Paper No. 5377300*.
+- **Siva Visvesvaran, Kaleb Smith and Jacob Mays**, [**Market-based Storage Dispatch and Capacity Accreditation in Electricity Markets**](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5377300), *SSRN Working Paper No. 5377300*.
   - Analyzes market-based battery storage dispatch, rolling look-ahead optimization, price formation, and capacity value in modern electricity markets.
-
-- **Model Predictive Control (MPC)** and rolling horizon mathematical programming in power systems.
 
 <details>
 <summary><b>BibTeX Citations</b></summary>
@@ -82,11 +79,11 @@ This application builds upon and is inspired by the following literature:
   url       = {https://warrenpowell.org/sdam/}
 }
 
-@article{visvesvaran2024market,
+@article{visvesvaran2025market,
   title     = {Market-based Storage Dispatch and Capacity Accreditation in Electricity Markets},
-  author    = {Visvesvaran, Siva and Mays, Jacob and Smith, Kaleb},
+  author    = {Visvesvaran, Siva and Smith, Kaleb and Mays, Jacob},
   journal   = {SSRN Electronic Journal},
-  year      = {2024},
+  year      = {2025},
   doi       = {10.2139/ssrn.5377300},
   url       = {https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5377300}
 }
