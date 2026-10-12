@@ -165,23 +165,23 @@ efficiency_pct = st.sidebar.slider(
 )
 eta_one_way = np.sqrt(efficiency_pct / 100.0)
 
-degradation_cost = st.sidebar.slider(
-    "Cell Degradation Cost ($/MWh)",
-    min_value=0.0,
-    max_value=40.0,
-    value=0.0,
-    step=2.5,
-    help="Marginal wear-and-tear cost per MWh discharged. Acts as a threshold deadband on arbitrage spreads.",
-)
+# degradation_cost = st.sidebar.slider(
+#     "Cell Degradation Cost ($/MWh)",
+#     min_value=0.0,
+#     max_value=40.0,
+#     value=0.0,
+#     step=2.5,
+#     help="Marginal wear-and-tear cost per MWh discharged. Acts as a threshold deadband on arbitrage spreads.",
+# )
 
-forecast_noise = st.sidebar.slider(
-    "Price Forecast Uncertainty (Noise Std $/MWh)",
-    min_value=0.0,
-    max_value=25.0,
-    value=0.0,
-    step=2.5,
-    help="Adds forecast error to future look-ahead hours, demonstrating sequential adaptation.",
-)
+# forecast_noise = st.sidebar.slider(
+#     "Price Forecast Uncertainty (Noise Std $/MWh)",
+#     min_value=0.0,
+#     max_value=25.0,
+#     value=0.0,
+#     step=2.5,
+#     help="Adds forecast error to future look-ahead hours, demonstrating sequential adaptation.",
+# )
 
 # ------------------------------------------------------------------------------
 # Model Simulation Execution
@@ -193,7 +193,7 @@ battery = BatteryParameters(
     eta_d=eta_one_way,
     soc_min_frac=0.10,
     soc_max_frac=0.90,
-    degradation_cost_per_mwh=degradation_cost,
+    degradation_cost_per_mwh=0.0,
 )
 
 prices = get_scenario_prices(scenario_name, T=total_hours, variation=price_variation)
@@ -204,7 +204,7 @@ sim_res = simulate_rolling_horizon(
     price_profile=prices,
     initial_soc_mwh=initial_soc_mwh,
     horizon=lookahead_horizon,
-    forecast_noise_std=forecast_noise,
+    forecast_noise_std=0.0,
     seed=42,
 )
 
