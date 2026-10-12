@@ -6,7 +6,7 @@
 
 An interactive **Streamlit** application featuring **Sequential Optimization and Rolling Horizon Dispatch** for battery storage systems. 
 
-Based on **Prof. Warren Powell's** *Sequential Decision Analytics (SDA)* framework, this repository demonstrates how persistent models and **in-place Right-Hand Side (RHS) updates** empower real-time battery arbitrage under shifting market forecasts.
+Based on **Prof. Warren Powell's** [*Sequential Decision Analytics (SDA)*](https://warrenpowell.org/sdam/) framework and recent research on [market-based storage dispatch](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5377300), this repository demonstrates how persistent models and **in-place Right-Hand Side (RHS) updates** empower real-time battery arbitrage under shifting market forecasts.
 
 ---
 
@@ -59,8 +59,36 @@ battery_storage_optimization/
 
 ---
 
-## 🏛️ Academic Foundation
+## 🏛️ Academic Foundation & References
 
-This application is inspired by:
-- **Warren B. Powell**, *Sequential Decision Analytics and Modeling: Modeling with Python*, Princeton University.
-- **Model Predictive Control (MPC)** and Rolling Horizon Dispatch in Power Systems.
+This application builds upon and is inspired by the following literature:
+
+- **Warren B. Powell**, [**Sequential Decision Analytics and Modeling: Modeling with Python**](https://warrenpowell.org/sdam/), Princeton University.
+  - Formalizes sequential decision analytics (SDA), direct look-ahead (DLA) policies, state transition dynamics, and persistent rolling horizon formulations.
+
+- **Siva Visvesvaran, Jacob Mays, and Kaleb Smith**, [**Market-based Storage Dispatch and Capacity Accreditation in Electricity Markets**](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5377300), *SSRN Working Paper No. 5377300*.
+  - Analyzes market-based battery storage dispatch, rolling look-ahead optimization, price formation, and capacity value in modern electricity markets.
+
+- **Model Predictive Control (MPC)** and rolling horizon mathematical programming in power systems.
+
+<details>
+<summary><b>BibTeX Citations</b></summary>
+
+```bibtex
+@book{powell2022sdam,
+  title     = {Sequential Decision Analytics and Modeling: Modeling with Python},
+  author    = {Powell, Warren B.},
+  year      = {2022},
+  url       = {https://warrenpowell.org/sdam/}
+}
+
+@article{visvesvaran2024market,
+  title     = {Market-based Storage Dispatch and Capacity Accreditation in Electricity Markets},
+  author    = {Visvesvaran, Siva and Mays, Jacob and Smith, Kaleb},
+  journal   = {SSRN Electronic Journal},
+  year      = {2024},
+  doi       = {10.2139/ssrn.5377300},
+  url       = {https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5377300}
+}
+```
+</details>
