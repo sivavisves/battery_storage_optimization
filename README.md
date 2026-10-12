@@ -19,7 +19,7 @@ Based on **Prof. Warren Powell's** [*Sequential Decision Analytics (SDA)*](https
 | **Battery Sizing** | **Capacity & Power ($E_{max}, P_{max}$)** | Configures storage duration (e.g. 4-hour utility scale vs 2-hour peaker) and C-rate. |
 | **Efficiency** | **Round-Trip Efficiency ($\eta_{rt}$)** | From 75% to 98%. Dictates the minimum arbitrage spread needed to overcome roundtrip losses. |
 | **Battery Health** | **Degradation Cost ($/MWh)** | Cell cycling wear cost. Acts as an economic deadband, preventing the battery from cycling for tiny price spreads. |
-| **Market Profiles** | **Wholesale Price Scenarios** | Test against California Duck Curve, Summer Heatwave Spikes, Winter Dual-Peak, and Negative Pricing! |
+| **Market Profiles** | **Wholesale Price Scenarios** | Test against California Duck Curve, Summer Heatwave Spikes, and Winter Dual-Peak! |
 | **Market Volatility** | **Day-to-Day Price Variation** | Scale day-to-day weather divergence and intra-day wholesale price volatility across multi-day horizons. |
 
 ---

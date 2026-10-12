@@ -4,7 +4,6 @@ Provides realistic wholesale price dynamics with multi-day meteorological evolut
 - California Duck Curve (High Solar Penetration)
 - Summer Heatwave & Scarcity Price Spikes
 - Winter Heating Dual-Peak (Morning & Evening)
-- Renewable Curtailment / Negative Pricing Events
 """
 
 import numpy as np
@@ -149,47 +148,10 @@ def generate_winter_dual_peak(T=48, base_price=38.0, variation=0.5, seed=42):
     return prices
 
 
-def generate_negative_pricing(T=48, base_price=28.0, variation=0.5, seed=42):
-    """
-    Simulates renewable curtailment and transmission congestion events:
-    - Day 1: Classic midday solar overgeneration (negative prices 11 AM - 3 PM down to -$15/MWh).
-    - Day 2: Extreme combined wind/solar glut (prolonged negative pricing down to -$32/MWh).
-    - Day 3: Overnight nocturnal wind curtailment (negative from 1-4 AM) plus afternoon solar dip.
-    """
-    prices = np.zeros(T)
-    texture = _generate_market_texture(T, variation, seed=seed + 30)
-    for t in range(T):
-        d = t // 24
-        h = t % 24
-        cycle = d % 3
-
-        if cycle == 0:
-            base = base_price
-            curtail = -44.0 * np.exp(-0.5 * ((h - 13.0) / 1.8) ** 2)
-            evening = 78.0 * np.exp(-0.5 * ((h - 20.0) / 2.2) ** 2)
-            night = 0.0
-        elif cycle == 1:
-            # Day 2: Deep multi-hour renewable glut
-            base = base_price - 4.0 * variation
-            curtail = -(50.0 + 18.0 * variation) * np.exp(-0.5 * ((h - 12.5) / 2.4) ** 2)
-            evening = (85.0 + 25.0 * variation) * np.exp(-0.5 * ((h - 20.5) / 2.0) ** 2)
-            night = -4.0 * variation * np.exp(-0.5 * ((h - 2.0) / 2.0) ** 2)
-        else:
-            # Day 3: Night wind curtailment event + secondary solar dip
-            base = base_price + 2.0 * variation
-            curtail = -(36.0 - 8.0 * variation) * np.exp(-0.5 * ((h - 13.0) / 1.6) ** 2)
-            evening = (72.0 + 12.0 * variation) * np.exp(-0.5 * ((h - 19.5) / 2.1) ** 2)
-            night = -(30.0 + 8.0 * variation) * np.exp(-0.5 * ((h - 2.5) / 1.8) ** 2)
-
-        prices[t] = base + curtail + evening + night + texture[t]
-    return prices
-
-
 SCENARIO_MAP = {
     "California Duck Curve (High Solar)": generate_duck_curve,
     "Summer Heatwave & Scarcity Spikes": generate_heatwave_spikes,
     "Winter Heating (Dual Peak)": generate_winter_dual_peak,
-    "Renewable Curtailment (Negative Prices)": generate_negative_pricing,
 }
 
 SCENARIO_DESCRIPTIONS = {
@@ -205,10 +167,6 @@ SCENARIO_DESCRIPTIONS = {
     "Winter Heating (Dual Peak)": (
         "Two daily commercial and heating peaks: morning commute (7-9 AM) and evening lighting/heating (6-8 PM). "
         "Features freezing cold snaps and nocturnal wind shifts causing dynamic day-to-day contrast."
-    ),
-    "Renewable Curtailment (Negative Prices)": (
-        "Deep negative prices (down to -$32/MWh) during solar/wind overgeneration. "
-        "The battery earns revenue by soaking up grid congestion across varying day-to-day curtailment windows."
     ),
 }
 
